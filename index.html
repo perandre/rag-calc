@@ -1,0 +1,518 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI RAG Cost Calculator</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f8fafc; /* slate-50 (Shadcn-like page background) */
+            color: #0f172a; /* slate-900 (Shadcn-like body text) */
+        }
+        .calculator-container {
+            max-width: 800px;
+            margin: 3rem auto;
+            padding: 2.5rem;
+            background-color: white; /* card background */
+            border-radius: 0.75rem; /* lg (Shadcn card border-radius) */
+            border: 1px solid #e2e8f0; /* slate-200 (Shadcn card border) */
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -2px rgba(0, 0, 0, 0.05); /* shadow-md, slightly softer */
+        }
+        .input-group {
+            margin-bottom: 1.5rem; 
+        }
+        label {
+            display: block;
+            margin-bottom: 0.5rem; 
+            font-weight: 500; /* medium */
+            color: #334155; /* slate-700 */
+            font-size: 0.875rem; /* text-sm */
+        }
+        input[type="number"], select {
+            width: 100%;
+            padding: 0.5rem 0.75rem; /* py-2 px-3 (Shadcn input padding) */
+            height: 2.5rem; /* h-10 (Shadcn input height) */
+            border: 1px solid #cbd5e1; /* slate-300 (Shadcn input border) */
+            border-radius: 0.375rem; /* rounded-md (Shadcn input border-radius) */
+            box-sizing: border-box;
+            transition: border-color 0.2s, box-shadow 0.2s;
+            font-size: 0.875rem; /* text-sm */
+            background-color: white;
+            color: #0f172a; /* slate-900 */
+        }
+        input[type="number"]:focus, select:focus {
+            border-color: #4f46e5; /* ring (indigo-600 as accent) */
+            outline: 2px solid transparent;
+            outline-offset: 2px;
+            box-shadow: 0 0 0 2px white, 0 0 0 4px #4f46e5; /* Emulate ring-2 ring-ring ring-offset-2 */
+        }
+        .results-card {
+            margin-top: 2.5rem;
+            padding: 2rem;
+            background-color: #f8fafc; /* slate-50 */
+            border: 1px solid #e2e8f0; /* slate-200 */
+            border-radius: 0.75rem; /* lg */
+        }
+        .results-card h3 {
+            color: #1e293b; /* slate-800 */
+            margin-bottom: 1.5rem;
+            font-size: 1.125rem; /* text-lg */
+            font-weight: 600; /* semibold */
+            border-bottom: 1px solid #e2e8f0; /* slate-200 */
+            padding-bottom: 0.75rem;
+        }
+        .result-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 0.875rem 0; 
+            border-bottom: 1px solid #e2e8f0; /* slate-200, solid border */
+            font-size: 0.875rem; /* text-sm */
+        }
+        .result-item:last-child {
+            border-bottom: none;
+        }
+        .result-item span:first-child {
+            font-weight: 500; /* medium */
+            color: #475569; /* slate-600 */
+        }
+        .result-item span:last-child {
+            font-weight: 600; /* semibold */
+            color: #0f172a; /* slate-900 */
+        }
+        .total-cost-item span:first-child {
+            font-weight: 600; 
+            color: #0f172a; 
+        }
+        .total-cost-item span:last-child {
+             font-size: 1.125rem; /* text-lg */
+             font-weight: 700; /* bold */
+             color: #3730a3; /* indigo-800 */
+        }
+        .warning { /* Emulating Shadcn Alert - Destructive-like */
+            color: #991b1b; /* red-800 */
+            background-color: #fee2e2; /* red-100 */
+            border: 1px solid #fecaca; /* red-200 */
+            border-left-width: 4px;
+            border-left-color: #dc2626; /* red-600 */
+            padding: 1rem;
+            border-radius: 0.375rem; /* md */
+            font-size: 0.875rem;
+            margin-top: 1.5rem;
+        }
+        .warning p { margin-bottom: 0.25rem; }
+        .warning p:last-child { margin-bottom: 0; }
+
+        .info-tooltip {
+            position: relative;
+            display: inline-block;
+            margin-left: 0.375rem; 
+            cursor: help;
+        }
+        .info-tooltip .tooltip-text { /* Shadcn Tooltip inspired */
+            visibility: hidden;
+            width: 260px; 
+            background-color: #0f172a; /* slate-900 */
+            color: #f8fafc; /* slate-50 */
+            text-align: left; 
+            border-radius: 0.375rem; /* md */
+            padding: 0.5rem 0.75rem; /* py-2 px-3 */
+            position: absolute;
+            z-index: 10;
+            bottom: 135%; 
+            left: 50%;
+            margin-left: -130px; 
+            opacity: 0;
+            transition: opacity 0.2s;
+            font-size: 0.75rem; /* text-xs */
+            line-height: 1.4;
+            box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1), 0 2px 4px -1px rgba(0,0,0,0.06); /* shadow-md */
+        }
+        .info-tooltip:hover .tooltip-text {
+            visibility: visible;
+            opacity: 1;
+        }
+        .info-icon {
+            display: inline-flex; 
+            align-items: center;
+            justify-content: center;
+            width: 16px; 
+            height: 16px; 
+            background-color: #94a3b8; /* slate-400 */
+            color: white;
+            border-radius: 50%;
+            font-size: 10px; 
+            line-height: 16px;
+            font-weight: 700; /* bold */
+        }
+        h1, h2 {
+            text-align: center;
+        }
+        h1 { 
+            font-size: 1.875rem; /* text-3xl */
+            margin-bottom: 0.5rem; 
+            font-weight: 700; /* bold */
+            color: #0f172a; /* slate-900 */
+            letter-spacing: -0.025em; /* tracking-tight */
+        }
+        h2 { 
+            font-size: 1rem; /* text-base */
+            margin-bottom: 2.5rem; 
+            color: #64748b; /* slate-500 */
+        }
+        .calculated-value {
+            padding: 0.75rem 1rem; /* py-3 px-4 */
+            background-color: #f1f5f9; /* slate-100 */
+            border: 1px solid #e2e8f0; /* slate-200 */
+            border-radius: 0.375rem; /* md */
+            font-weight: 600; /* semibold */
+            color: #1e40af; /* blue-700 */
+            font-size: 0.875rem; /* text-sm */
+            text-align: center;
+        }
+        .footer-note {
+            font-size: 0.8125rem; 
+            color: #64748b; /* slate-500 */
+            margin-top: 2.5rem;
+            text-align: center;
+            line-height: 1.6;
+        }
+        .model-placeholder-note {
+            font-size: 0.75rem; 
+            color: #991b1b; /* red-800 */
+            text-align: center;
+            margin-top: 0.5rem;
+            font-style: italic;
+        }
+    </style>
+</head>
+<body>
+    <div class="calculator-container">
+        <h1>Frontkom RAG Cost Calculator</h1>
+        <h2>Estimate Token Usage & API Costs for LLM Applications</h2>
+
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-1"> 
+            <div class="input-group">
+                <label for="model">Select LLM Model:</label>
+                <select id="model">
+                    </select>
+                <p id="modelPlaceholderNotice" class="model-placeholder-note"></p>
+            </div>
+
+            <div class="input-group">
+                <label for="systemPromptTokens">System Prompt Tokens
+                    <span class="info-tooltip">
+                        <span class="info-icon">i</span>
+                        <span class="tooltip-text">Tokens for instructions given to the AI (e.g., "You are a helpful assistant..."). Typically sent with each Q&A turn.</span>
+                    </span>
+                </label>
+                <input type="number" id="systemPromptTokens" value="1000" min="0">
+            </div>
+
+            <div class="input-group">
+                <label for="avgChunkSize">Average Chunk Size (Tokens)
+                     <span class="info-tooltip">
+                        <span class="info-icon">i</span>
+                        <span class="tooltip-text">The average number of tokens in each document chunk your RAG system retrieves.</span>
+                    </span>
+                </label>
+                <input type="number" id="avgChunkSize" value="200" min="0">
+            </div>
+
+            <div class="input-group">
+                <label for="numChunksToRetrieve">Number of Chunks to Retrieve
+                     <span class="info-tooltip">
+                        <span class="info-icon">i</span>
+                        <span class="tooltip-text">How many document chunks are retrieved and sent to the LLM per user query.</span>
+                    </span>
+                </label>
+                <input type="number" id="numChunksToRetrieve" value="5" min="0">
+            </div>
+            
+            <div class="input-group md:col-span-2"> <label for="retrievedContextTokensDisplay">Calculated Avg. Retrieved Context Tokens per Query
+                    <span class="info-tooltip">
+                        <span class="info-icon">i</span>
+                        <span class="tooltip-text">Automatically calculated: (Avg. Chunk Size) × (Number of Chunks to Retrieve). This total is added to the LLM prompt with each user question.</span>
+                    </span>
+                </label>
+                <div id="retrievedContextTokensDisplay" class="calculated-value">1,000</div>
+            </div>
+
+            <div class="input-group">
+                <label for="userQueryTokens">Avg. User Query Tokens
+                    <span class="info-tooltip">
+                        <span class="info-icon">i</span>
+                        <span class="tooltip-text">Average number of tokens in a typical user question.</span>
+                    </span>
+                </label>
+                <input type="number" id="userQueryTokens" value="5" min="0">
+            </div>
+            
+            <div class="input-group">
+                <label for="modelAnswerTokens">Avg. Model Answer Tokens
+                    <span class="info-tooltip">
+                        <span class="info-icon">i</span>
+                        <span class="tooltip-text">Average number of tokens in a typical AI model response.</span>
+                    </span>
+                </label>
+                <input type="number" id="modelAnswerTokens" value="40" min="0">
+            </div>
+
+            <div class="input-group md:col-span-2">
+                <label for="qaTurns">Number of Q&A Turns per Conversation:</label>
+                <input type="number" id="qaTurns" value="10" min="1">
+            </div>
+        </div>
+
+        <div class="input-group mt-8 border-t border-slate-200 pt-6"> 
+            <h3 class="text-base font-semibold text-slate-700 mb-3">Optional: One-Time Embedding Cost</h3>
+            <label for="totalCorpusTokens">Total Corpus Tokens (for initial embedding)
+                <span class="info-tooltip">
+                    <span class="info-icon">i</span>
+                    <span class="tooltip-text">Total tokens in your entire document library for the one-time embedding process. Calculated using OpenAI's text-embedding-3-small ($0.02/1M tokens).</span>
+                </span>
+            </label>
+            <input type="number" id="totalCorpusTokens" value="300000" min="0">
+        </div>
+
+
+        <div class="results-card">
+            <h3>Estimated Results</h3>
+            <div class="result-item">
+                <span>Total Input Tokens (per Conversation):</span>
+                <span id="totalInputTokensResult">-</span>
+            </div>
+            <div class="result-item">
+                <span>Total Output Tokens (per Conversation):</span>
+                <span id="totalOutputTokensResult">-</span>
+            </div>
+            <div class="result-item">
+                <span>Max Tokens in a Single Turn (Input):</span>
+                <span id="maxTokensSingleTurnResult">-</span>
+            </div>
+            <div class="result-item">
+                <span>Est. LLM Cost (Single Conversation):</span>
+                <span id="llmCostResult">-</span>
+            </div>
+            <div class="result-item">
+                <span>Est. Embedding Cost (One-time):</span>
+                <span id="embeddingCostResult">-</span>
+            </div>
+            <div class="result-item total-cost-item border-t-2 border-indigo-200 pt-3 mt-3"> 
+                <span>Total LLM Cost for 1 Million Conversations:</span>
+                <span id="totalMillionConversationsCostResult">-</span>
+            </div>
+            <div id="warnings" class="mt-6"></div>
+        </div>
+         <p class="footer-note">
+            Disclaimer: Prices based on public data & subject to change. Estimates for RAG scenarios. Actual costs may vary. Hypothetical model values are illustrative.
+        </p>
+    </div>
+
+    <script>
+        // --- Model Data ---
+        // Prices are per 1 Million tokens.
+        const models = {
+            "gemini-1.5-flash": {
+                name: "Google Gemini 1.5 Flash",
+                inputPricePerMillionTokens: 0.075, // UPDATED PRICE (for <=128k prompts)
+                outputPricePerMillionTokens: 0.30, // UPDATED PRICE (for <=128k prompts)
+                contextWindow: 1048576, 
+                isPlaceholder: false
+            },
+            "gemini-2.0-flash": { 
+                name: "Google Gemini 2.0 Flash", // Name updated
+                inputPricePerMillionTokens: 0.10, // UPDATED PRICE (text/image/video)
+                outputPricePerMillionTokens: 0.40, // UPDATED PRICE
+                contextWindow: 1000000, 
+                isPlaceholder: false // Assuming this is a confirmed model tier based on search
+            },
+            "gemini-2.0-flash-lite": { 
+                name: "Google Gemini 2.0 Flash-Lite", // Name updated
+                inputPricePerMillionTokens: 0.0375, // UPDATED PRICE (for <=128k prompts)
+                outputPricePerMillionTokens: 0.15,   // UPDATED PRICE (for <=128k prompts)
+                contextWindow: 1000000, 
+                isPlaceholder: false // Assuming this is a confirmed model tier
+            },
+            "gpt-4.1-nano": { 
+                name: "OpenAI GPT-4.1 Nano", 
+                inputPricePerMillionTokens: 0.10, 
+                outputPricePerMillionTokens: 0.40, 
+                contextWindow: 1000000, 
+                isPlaceholder: false 
+            },
+            "gpt-4.1-mini": { 
+                name: "OpenAI GPT-4.1 Mini", 
+                inputPricePerMillionTokens: 0.40, 
+                outputPricePerMillionTokens: 1.60, 
+                contextWindow: 1000000, 
+                isPlaceholder: false 
+            },
+            "gpt-4.1": { 
+                name: "OpenAI GPT-4.1", 
+                inputPricePerMillionTokens: 2.00, 
+                outputPricePerMillionTokens: 8.00, 
+                contextWindow: 1000000, 
+                isPlaceholder: false 
+            }
+        };
+
+        // --- Constants ---
+        const CONVERSATIONS_FOR_TOTAL_COST = 1000000; 
+        const TEXT_EMBEDDING_3_SMALL_PRICE_PER_MILLION_TOKENS = 0.02; 
+
+        // --- DOM Elements ---
+        const modelSelect = document.getElementById('model');
+        const modelPlaceholderNoticeEl = document.getElementById('modelPlaceholderNotice'); 
+        const systemPromptTokensInput = document.getElementById('systemPromptTokens');
+        const avgChunkSizeInput = document.getElementById('avgChunkSize');
+        const numChunksToRetrieveInput = document.getElementById('numChunksToRetrieve');
+        const retrievedContextTokensDisplayEl = document.getElementById('retrievedContextTokensDisplay'); 
+        const userQueryTokensInput = document.getElementById('userQueryTokens'); 
+        const modelAnswerTokensInput = document.getElementById('modelAnswerTokens');
+        const qaTurnsInput = document.getElementById('qaTurns');
+        const totalCorpusTokensInput = document.getElementById('totalCorpusTokens');
+        const totalInputTokensResultEl = document.getElementById('totalInputTokensResult');
+        const totalOutputTokensResultEl = document.getElementById('totalOutputTokensResult');
+        const maxTokensSingleTurnResultEl = document.getElementById('maxTokensSingleTurnResult');
+        const llmCostResultEl = document.getElementById('llmCostResult'); 
+        const embeddingCostResultEl = document.getElementById('embeddingCostResult');
+        const warningsEl = document.getElementById('warnings');
+        const totalMillionConversationsCostResultEl = document.getElementById('totalMillionConversationsCostResult');
+
+
+        // --- Functions ---
+        function populateModelDropdown() {
+            for (const key in models) {
+                const option = document.createElement('option');
+                option.value = key;
+                option.textContent = models[key].name;
+                modelSelect.appendChild(option);
+            }
+        }
+        
+        function displayModelPlaceholderNotice() {
+            const selectedModelKey = modelSelect.value;
+            if (models[selectedModelKey] && models[selectedModelKey].hasOwnProperty('isPlaceholder') && models[selectedModelKey].isPlaceholder) {
+                modelPlaceholderNoticeEl.textContent = "Note: Pricing & context for this model are illustrative placeholders.";
+            } else {
+                modelPlaceholderNoticeEl.textContent = "";
+            }
+        }
+
+
+        function calculateCosts() {
+            const selectedModelKey = modelSelect.value;
+            if (!selectedModelKey || !models[selectedModelKey]) {
+                 warningsEl.innerHTML = '<p>Please select a valid LLM model.</p>';
+                 totalInputTokensResultEl.textContent = '-';
+                 totalOutputTokensResultEl.textContent = '-';
+                 maxTokensSingleTurnResultEl.textContent = '-';
+                 llmCostResultEl.textContent = '-';
+                 totalMillionConversationsCostResultEl.textContent = '-';
+                 return; 
+            }
+            const model = models[selectedModelKey];
+            displayModelPlaceholderNotice(); 
+
+            const systemPromptTokens = parseInt(systemPromptTokensInput.value) || 0;
+            const avgChunkSize = parseInt(avgChunkSizeInput.value) || 0;
+            const numChunksToRetrieve = parseInt(numChunksToRetrieveInput.value) || 0;
+            const avgRetrievedContextTokensPerQuery = avgChunkSize * numChunksToRetrieve;
+            retrievedContextTokensDisplayEl.textContent = avgRetrievedContextTokensPerQuery.toLocaleString(); 
+            const userQueryTokensPerTurn = parseInt(userQueryTokensInput.value) || 0;
+            const modelAnswerTokensPerTurn = parseInt(modelAnswerTokensInput.value) || 0;
+            const numQaTurns = parseInt(qaTurnsInput.value) || 1;
+            const totalCorpusTokensForEmbedding = parseInt(totalCorpusTokensInput.value) || 0;
+            
+            warningsEl.innerHTML = ''; 
+
+            let cumulativeTotalInputTokens = 0;
+            let cumulativeTotalOutputTokens = 0;
+            let conversationHistoryTokens = 0;
+            let maxTokensInASingleTurn = 0;
+
+            for (let i = 0; i < numQaTurns; i++) {
+                const currentTurnInputTokens = systemPromptTokens + 
+                                             avgRetrievedContextTokensPerQuery + 
+                                             conversationHistoryTokens + 
+                                             userQueryTokensPerTurn;
+                
+                if (currentTurnInputTokens > maxTokensInASingleTurn) {
+                    maxTokensInASingleTurn = currentTurnInputTokens;
+                }
+
+                if (model.contextWindow && currentTurnInputTokens > model.contextWindow) { 
+                    const warningMsg = document.createElement('p');
+                    warningMsg.textContent = `Warning: Turn ${i + 1} input tokens (${currentTurnInputTokens.toLocaleString()}) exceed ${model.name}'s context window (${model.contextWindow.toLocaleString()}). Calculations might be inaccurate.`;
+                    warningsEl.appendChild(warningMsg);
+                }
+                
+                cumulativeTotalInputTokens += currentTurnInputTokens;
+                cumulativeTotalOutputTokens += modelAnswerTokensPerTurn;
+                conversationHistoryTokens += userQueryTokensPerTurn + modelAnswerTokensPerTurn;
+            }
+
+            const singleConversationLlmCost = (cumulativeTotalInputTokens / 1000000 * model.inputPricePerMillionTokens) +
+                                            (cumulativeTotalOutputTokens / 1000000 * model.outputPricePerMillionTokens);
+
+            const totalCostForMillionConversations = singleConversationLlmCost * CONVERSATIONS_FOR_TOTAL_COST;
+
+            let embeddingCost = 0;
+            if (totalCorpusTokensForEmbedding > 0) {
+                embeddingCost = (totalCorpusTokensForEmbedding / 1000000) * TEXT_EMBEDDING_3_SMALL_PRICE_PER_MILLION_TOKENS;
+            }
+
+            totalInputTokensResultEl.textContent = cumulativeTotalInputTokens.toLocaleString();
+            totalOutputTokensResultEl.textContent = cumulativeTotalOutputTokens.toLocaleString();
+            maxTokensSingleTurnResultEl.textContent = maxTokensInASingleTurn.toLocaleString();
+            llmCostResultEl.textContent = `$${singleConversationLlmCost.toFixed(4)}`;
+            embeddingCostResultEl.textContent = totalCorpusTokensForEmbedding > 0 ? `$${embeddingCost.toFixed(2)}` : 'N/A';
+            totalMillionConversationsCostResultEl.textContent = `$${totalCostForMillionConversations.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}`;
+
+            // Tiered pricing warning specifically for Gemini models that have it
+            if (model.name.toLowerCase().includes("gemini") && 
+                (model.name.includes("1.5 Flash") || model.name.includes("2.0 Flash-Lite")) && // Models with known tiered pricing
+                 maxTokensInASingleTurn > 128000) {
+                const tieredPricingWarning = document.createElement('p');
+                tieredPricingWarning.textContent = `Note for ${model.name}: This model has higher pricing for prompts over 128K tokens. The current calculation uses the base rate for prompts <= 128K tokens; actual costs for applicable turns may be higher.`;
+                warningsEl.appendChild(tieredPricingWarning);
+            }
+        }
+
+        // --- Event Listeners ---
+        function setupEventListeners() {
+            const inputs = [
+                modelSelect, systemPromptTokensInput, 
+                avgChunkSizeInput, numChunksToRetrieveInput, 
+                userQueryTokensInput, modelAnswerTokensInput, 
+                qaTurnsInput, totalCorpusTokensInput
+            ];
+            inputs.forEach(input => {
+                input.addEventListener('change', calculateCosts);
+                input.addEventListener('keyup', (event) => { 
+                    if (event.target.type === 'number') calculateCosts();
+                });
+                 input.addEventListener('input', (event) => { 
+                    if (event.target.type === 'number') calculateCosts();
+                });
+            });
+            modelSelect.addEventListener('change', displayModelPlaceholderNotice); 
+        }
+        
+        // --- Initialization ---
+        document.addEventListener('DOMContentLoaded', () => {
+            populateModelDropdown();
+            if (modelSelect.options.length > 0) { 
+                modelSelect.value = "gemini-1.5-flash"; 
+            }
+            setupEventListeners();
+            calculateCosts(); 
+            displayModelPlaceholderNotice(); 
+        });
+    </script>
+</body>
+</html>
